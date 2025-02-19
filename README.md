@@ -37,8 +37,8 @@ galaxy_info:
 - Rename unneeded files from the molecule init step
 
 ```
-mv -f nginx/molecule/default/create.yml nginx/molecule/default/ocreate.yml
-mv -f nginx/molecule/default/destroy.yml nginx/molecule/default/odestroy.yml
+mv -f nginx/molecule/default/create.yml nginx/molecule/default/create.yml.orig
+mv -f nginx/molecule/default/destroy.yml nginx/molecule/default/destroy.yml.orig
 ```
 
 ## Implement role and configure Molecule
@@ -48,6 +48,7 @@ mv -f nginx/molecule/default/destroy.yml nginx/molecule/default/odestroy.yml
 - Configure Molecule
 
 ```
+$ cat nginx/molecule/default/molecule.yml
 ---
 driver:
   name: podman
@@ -69,8 +70,11 @@ provisioner:
   name: ansible
 
 verifier:
-  name: testinfra
+  name: testinfra|ansible
 ```
+
+Depending on how the role should be tested, the `verifier` directive needs to be set accordingly.
+More information can be found in the next subsections.
 
 - Implement converge playbook, it installs the role
 
@@ -83,7 +87,21 @@ $ cat nginx/molecule/default/converge.yml
     - nginx
 ```
 
-- Implement the tests
+### Testing with `testinfra`
+
+When testing with `testinfra`, Python is used for testing inside the container.
+
+First the verifier should be set to `testinfra`:
+
+```
+$ cat nginx/molecule/default/molecule.yml
+[..]
+verifier:
+  name: testinfra
+```
+
+The tests are written in `.py` files inside the `nginx/molecule/default/tests` directory.
+Here an example:
 
 ```
 $ cat nginx/molecule/default/tests/test_default.py
@@ -113,7 +131,61 @@ def test_nginx_is_listening(host):
 
 All `.py` files in `nginx/molecule/default/tests` will be run as tests.
 
+### Testing with `ansible`
+
+When testing with Ansible, Ansible playbooks are being used.
+
+First the verifier should be set to `ansible`:
+
+```
+$ cat nginx/molecule/default/molecule.yml
+[..]
+verifier:
+  name: ansible
+```
+
+Creating a new role with the `ansible-galaxy role init` command, all default directories are being created.
+So is the `tests` directory created, with a `test.yml` playbook file and a test `inventory` file.
+
+To use this testing playbook in molecule, we can import it in the verify step:
+
+```
+$ cat nginx/molecule/default/verify.yml
+---
+- name: Run Ansible role tests
+  import_playbook: ../../tests/test.yml
+```
+
+A playbook to test this example nginx role could look like the following:
+
+```
+$ cat nginx/tests/test.yml
+---
+- name: Verify Nginx Installation
+  hosts: all
+  gather_facts: no
+  tasks:
+
+    - name: Check if Nginx package is installed
+      ansible.builtin.package:
+        name: nginx
+        state: present
+      register: nginx_package
+      failed_when: nginx_package is failed
+
+    - name: Ensure Nginx service is running
+      ansible.builtin.service:
+        name: nginx
+        state: started
+        enabled: yes
+      register: nginx_service
+      failed_when: not nginx_service.status.ActiveState == "active"
+```
+
 ### Run commands inside the container to prepare it for the test (optional)
+
+When using a standard container image it might be necessary to include additional preparation steps on the container.
+This can be done through the optional prepare playbook.
 
 ```
 $ cat nginx/molecule/default/molecule.yml
