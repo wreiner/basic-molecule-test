@@ -1,6 +1,6 @@
 # Testing Ansible Role With Molecule
 
-Very basic example on how to test Ansible roles with Molecule.
+Very basic example on how to test Ansible roles with Molecule in a podman or docker container.
 
 ## Basic Setup
 
@@ -40,6 +40,8 @@ galaxy_info:
 mv -f nginx/molecule/default/create.yml nginx/molecule/default/create.yml.orig
 mv -f nginx/molecule/default/destroy.yml nginx/molecule/default/destroy.yml.orig
 ```
+
+These files are not needed for this basic test in a podman or docker container.
 
 ## Implement role and configure Molecule
 
